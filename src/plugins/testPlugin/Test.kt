@@ -2,10 +2,10 @@ package plugins.testPlugin
 
 import main.Plugin
 
-abstract class Test : Plugin {
+class Test : Plugin {
 
     override fun load() {
-        println("test successful")
+        println("test1 successful")
     }
 
 }
