@@ -1,5 +1,6 @@
 package main
 
-interface Plugin {
-    fun load()
+open class Plugin {
+    fun Plugin() {}
+    open fun load() {}
 }

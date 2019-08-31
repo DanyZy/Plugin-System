@@ -1,16 +1,42 @@
 package main
 
-import java.io.File
+import java.net.URL
 import java.net.URLClassLoader
+import java.util.jar.JarFile
+import java.io.File
+
 
 fun main() {
-    val testJarFile = File("test.jar")
-    val testLoader = URLClassLoader.newInstance(arrayOf(testJarFile.toURL()))
-    val testPlugin = testLoader.loadClass("plugins.testPlugin.Test").newInstance() as Plugin
-    testPlugin.load()
 
-    val test2JarFile = File("test2.jar")
-    val test2Loader = URLClassLoader.newInstance(arrayOf(test2JarFile.toURL()))
-    val test2Plugin = test2Loader.loadClass("plugins.testPlugin2.Test2").newInstance() as Plugin
-    test2Plugin.load()
+    val directoryListing = File("src/plugins/").listFiles()
+    if (directoryListing != null) {
+        for (pluginSetPath in directoryListing) {
+            if (pluginSetPath.name.endsWith(".jar")) {
+                val pluginJarSet = JarFile(pluginSetPath)
+                val entries = pluginJarSet.entries()
+
+                val urls = arrayOf(URL("jar", "", -1, "file:$pluginSetPath!/"))
+                val classLoader = URLClassLoader.newInstance(urls)
+
+                while (entries.hasMoreElements()) {
+                    val plugin = entries.nextElement()
+                    if (plugin.isDirectory || !plugin.name.endsWith(".class")) {
+                        continue
+                    }
+                    // -6 because of .class
+                    var className = plugin.name.substring(0, plugin.name.length - 6)
+                    className = className.replace('/', '.')
+                    val clazz = classLoader.loadClass(className)
+                    val methods = clazz.declaredMethods
+                    for (method in methods) {
+                        if (method.name == "load") {
+                            method.invoke(clazz.newInstance())
+                        }
+                    }
+                }
+            } else {
+                continue
+            }
+        }
+    }
 }
