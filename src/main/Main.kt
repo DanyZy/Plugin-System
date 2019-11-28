@@ -8,21 +8,26 @@ import java.util.jar.JarFile
 import java.io.File
 import java.io.FileFilter
 import java.io.BufferedReader
+import java.io.IOException
+import java.nio.file.*
+
 
 fun main() {
     val pluginList = mutableListOf<Plugin>()
 
     val directoryListing = File("src/plugins/").listFiles(FileFilter{jarFilter(it)})
 
-    fromJarLoader(directoryListing, pluginList)
+    pluginListFilling(directoryListing, pluginList)
 
     val CM = ConfigManager("src/config/configList.json", Gson(), jsonString = mutableListOf())
     pluginLoader(pluginList, CM)
     println("_______________________________")
-    fromJsonLoader(pluginList, CM)
+    fromJsonPluginLoader(pluginList, CM)
+
+    watchChanges("src/plugins/")
 }
 
-fun fromJarLoader(directoryListing: Array<File>?, pluginList: MutableList<Plugin>) {
+fun pluginListFilling(directoryListing: Array<File>?, pluginList: MutableList<Plugin>) {
     if (directoryListing != null) {
         for (pluginSetPath in directoryListing) {
             val pluginJarSet = JarFile(pluginSetPath)
@@ -51,7 +56,7 @@ fun fromJarLoader(directoryListing: Array<File>?, pluginList: MutableList<Plugin
     }
 }
 
-fun fromJsonLoader(plugins: List<Plugin>, CM: ConfigManager) {
+fun fromJsonPluginLoader(plugins: List<Plugin>, CM: ConfigManager) {
     val bufferedReader: BufferedReader = CM.pluginConfigFile.bufferedReader()
     val jsonOutput = bufferedReader.use { it.readText() }
     val pluginNameList = CM.gson.fromJson(jsonOutput, mutableListOf<String>().javaClass)
@@ -84,4 +89,46 @@ fun pluginLoader (plugins: List<Plugin>, CM: ConfigManager) {
     }
 
     CM.pluginConfigFile.writeText(CM.jsonString.toString())
+}
+
+fun watchChanges(folder: String) {
+
+    val filePath = Paths.get(folder)
+    val watchService: WatchService
+
+    try {
+        watchService = FileSystems.getDefault().newWatchService()
+
+        //listen for create ,delete and modify event kinds
+        filePath.register(
+            watchService,
+            StandardWatchEventKinds.ENTRY_CREATE,
+            StandardWatchEventKinds.ENTRY_DELETE
+        )
+    } catch (e: IOException) {
+        e.printStackTrace()
+        return
+    }
+
+    while (true) {
+        val key: WatchKey
+        try {
+            //return signaled key, meaning events occurred on the object
+            key = watchService.take()
+        } catch (ex: InterruptedException) {
+            return
+        }
+
+        //retrieve all the accumulated events
+        for (event in key.pollEvents()) {
+            val kind = event.kind()
+
+            println("kind " + kind.name())
+            val path = event.context() as Path
+            println(path.toString())
+        }
+        //resetting the key goes back ready state
+        key.reset()
+    }
+
 }
